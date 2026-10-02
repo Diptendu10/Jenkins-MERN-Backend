@@ -1,18 +1,20 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-require('dotenv').config();
+import express from 'express';
+import mongoose from 'mongoose';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import dotenv from 'dotenv';
+import dns from 'dns';
 
-const dns = require('dns');
+dotenv.config();
+
 dns.setServers(['8.8.8.8', '1.1.1.1']);
 
 const app = express();
 
-// =========================
-// CORS Configuration
-// =========================
+// =====================================================
+// CORS CONFIGURATION
+// =====================================================
 
 const allowedOrigins = [
   process.env.FRONTEND_URL,
@@ -24,8 +26,8 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests without Origin
-      // (curl, Postman, server-to-server, etc.)
+      // Allow requests without an Origin header
+      // such as curl, Postman and server-to-server requests.
       if (!origin) {
         return callback(null, true);
       }
@@ -35,10 +37,18 @@ app.use(
       }
 
       console.log(`CORS blocked origin: ${origin}`);
+
       return callback(new Error('Not allowed by CORS'));
     },
 
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    methods: [
+      'GET',
+      'POST',
+      'PUT',
+      'DELETE',
+      'PATCH',
+      'OPTIONS'
+    ],
 
     credentials: true,
 
@@ -52,17 +62,17 @@ app.use(
   })
 );
 
-// =========================
-// Other Middleware
-// =========================
+// =====================================================
+// MIDDLEWARE
+// =====================================================
 
 app.use(helmet());
 app.use(morgan('combined'));
 app.use(express.json());
 
-// =========================
-// MongoDB Configuration
-// =========================
+// =====================================================
+// MONGODB CONFIGURATION
+// =====================================================
 
 const isMongoConfigured = () => {
   return (
@@ -71,6 +81,10 @@ const isMongoConfigured = () => {
     !process.env.MONGODB_URI.includes('<')
   );
 };
+
+// =====================================================
+// DATABASE CHECK
+// =====================================================
 
 const ensureDatabase = (res) => {
   if (mongoose.connection.readyState !== 1) {
@@ -86,15 +100,16 @@ const ensureDatabase = (res) => {
   return true;
 };
 
-// =========================
-// MongoDB Atlas Connection
-// =========================
+// =====================================================
+// MONGODB ATLAS CONNECTION
+// =====================================================
 
 const connectDB = async () => {
   if (!isMongoConfigured()) {
     console.warn(
       'Warning: MONGODB_URI is not configured. Starting the API without a database connection.'
     );
+
     return;
   }
 
@@ -103,13 +118,16 @@ const connectDB = async () => {
 
     console.log('Success: MongoDB Atlas Connected Successfully');
   } catch (error) {
-    console.error('Error: MongoDB Connection Error:', error.message);
+    console.error(
+      'Error: MongoDB Connection Error:',
+      error.message
+    );
   }
 };
 
-// =========================
-// User Model
-// =========================
+// =====================================================
+// USER MODEL
+// =====================================================
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -136,16 +154,20 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', userSchema);
 
-// =========================
-// Health Route
-// =========================
+// =====================================================
+// HEALTH CHECK
+// =====================================================
 
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'OK',
     message: 'Backend API is running',
+
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
+
+    environment:
+      process.env.NODE_ENV || 'development',
+
     database:
       mongoose.connection.readyState === 1
         ? 'connected'
@@ -153,15 +175,18 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// =========================
-// GET All Users
-// =========================
+// =====================================================
+// GET ALL USERS
+// =====================================================
 
 app.get('/api/users', async (req, res) => {
-  if (!ensureDatabase(res)) return;
+  if (!ensureDatabase(res)) {
+    return;
+  }
 
   try {
-    const users = await User.find().sort({ createdAt: -1 });
+    const users = await User.find()
+      .sort({ createdAt: -1 });
 
     res.json({
       success: true,
@@ -169,7 +194,10 @@ app.get('/api/users', async (req, res) => {
       count: users.length
     });
   } catch (error) {
-    console.error('GET /api/users error:', error);
+    console.error(
+      'GET /api/users error:',
+      error
+    );
 
     res.status(500).json({
       success: false,
@@ -178,15 +206,21 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-// =========================
-// CREATE User
-// =========================
+// =====================================================
+// CREATE USER
+// =====================================================
 
 app.post('/api/users', async (req, res) => {
-  if (!ensureDatabase(res)) return;
+  if (!ensureDatabase(res)) {
+    return;
+  }
 
   try {
-    const { name, email, role } = req.body;
+    const {
+      name,
+      email,
+      role
+    } = req.body;
 
     const user = new User({
       name,
@@ -201,7 +235,10 @@ app.post('/api/users', async (req, res) => {
       data: user
     });
   } catch (error) {
-    console.error('POST /api/users error:', error);
+    console.error(
+      'POST /api/users error:',
+      error
+    );
 
     res.status(400).json({
       success: false,
@@ -210,58 +247,18 @@ app.post('/api/users', async (req, res) => {
   }
 });
 
-// =========================
-// GET User By ID
-// =========================
+// =====================================================
+// GET USER BY ID
+// =====================================================
 
 app.get('/api/users/:id', async (req, res) => {
-  if (!ensureDatabase(res)) return;
-
-  try {
-    const user = await User.findById(req.params.id);
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: user
-    });
-  } catch (error) {
-    console.error('GET /api/users/:id error:', error);
-
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+  if (!ensureDatabase(res)) {
+    return;
   }
-});
-
-// =========================
-// UPDATE User
-// =========================
-
-app.put('/api/users/:id', async (req, res) => {
-  if (!ensureDatabase(res)) return;
 
   try {
-    const { name, email, role } = req.body;
-
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      {
-        name,
-        email,
-        role
-      },
-      {
-        new: true,
-        runValidators: true
-      }
+    const user = await User.findById(
+      req.params.id
     );
 
     if (!user) {
@@ -276,7 +273,64 @@ app.put('/api/users/:id', async (req, res) => {
       data: user
     });
   } catch (error) {
-    console.error('PUT /api/users/:id error:', error);
+    console.error(
+      'GET /api/users/:id error:',
+      error
+    );
+
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// =====================================================
+// UPDATE USER
+// =====================================================
+
+app.put('/api/users/:id', async (req, res) => {
+  if (!ensureDatabase(res)) {
+    return;
+  }
+
+  try {
+    const {
+      name,
+      email,
+      role
+    } = req.body;
+
+    const user =
+      await User.findByIdAndUpdate(
+        req.params.id,
+        {
+          name,
+          email,
+          role
+        },
+        {
+          new: true,
+          runValidators: true
+        }
+      );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: user
+    });
+  } catch (error) {
+    console.error(
+      'PUT /api/users/:id error:',
+      error
+    );
 
     res.status(400).json({
       success: false,
@@ -285,15 +339,20 @@ app.put('/api/users/:id', async (req, res) => {
   }
 });
 
-// =========================
-// DELETE User
-// =========================
+// =====================================================
+// DELETE USER
+// =====================================================
 
 app.delete('/api/users/:id', async (req, res) => {
-  if (!ensureDatabase(res)) return;
+  if (!ensureDatabase(res)) {
+    return;
+  }
 
   try {
-    const user = await User.findByIdAndDelete(req.params.id);
+    const user =
+      await User.findByIdAndDelete(
+        req.params.id
+      );
 
     if (!user) {
       return res.status(404).json({
@@ -307,7 +366,10 @@ app.delete('/api/users/:id', async (req, res) => {
       message: 'User deleted successfully'
     });
   } catch (error) {
-    console.error('DELETE /api/users/:id error:', error);
+    console.error(
+      'DELETE /api/users/:id error:',
+      error
+    );
 
     res.status(500).json({
       success: false,
@@ -316,15 +378,63 @@ app.delete('/api/users/:id', async (req, res) => {
   }
 });
 
-// =========================
-// Start Server
-// =========================
+// =====================================================
+// 404 HANDLER
+// =====================================================
+
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: `Route not found: ${req.method} ${req.originalUrl}`
+  });
+});
+
+// =====================================================
+// GLOBAL ERROR HANDLER
+// =====================================================
+
+app.use((error, req, res, next) => {
+  console.error(
+    'Global server error:',
+    error
+  );
+
+  if (error.message === 'Not allowed by CORS') {
+    return res.status(403).json({
+      success: false,
+      error: 'CORS policy blocked this origin'
+    });
+  }
+
+  res.status(500).json({
+    success: false,
+    error: 'Internal server error'
+  });
+});
+
+// =====================================================
+// START SERVER
+// =====================================================
 
 const PORT = process.env.PORT || 5000;
 
-connectDB();
+const startServer = async () => {
+  await connectDB();
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log('Allowed CORS origins:', allowedOrigins);
-});
+  app.listen(
+    PORT,
+    '0.0.0.0',
+    () => {
+      console.log(
+        `Server running on port ${PORT}`
+      );
+
+      console.log(
+        'Allowed CORS origins:',
+        allowedOrigins
+      );
+    }
+  );
+};
+
+startServer();
