@@ -19,6 +19,7 @@ const app = express();
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'http://100.58.106.241',
+  'http://54.221.52.108',
   'http://localhost:3000',
   'http://127.0.0.1:3000'
 ].filter(Boolean);
